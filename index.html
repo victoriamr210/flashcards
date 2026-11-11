@@ -30,6 +30,12 @@
   ul.missed { text-align:left; background:var(--card); border-radius:12px; padding:1rem 1rem 1rem 2rem; }
   .error { color:var(--bad); }
   .link { background:none; color:var(--muted); text-decoration:underline; margin-top:1rem; }
+  .searchbar { display:flex; gap:.5rem; margin-bottom:.75rem; }
+  .searchbar button { white-space:nowrap; }
+  .search { flex:1; min-width:0; font:inherit; padding:.7rem .9rem; border:1px solid #d8d4cc; border-radius:10px; }
+  table.list { width:100%; border-collapse:collapse; background:var(--card); border-radius:12px; overflow:hidden; text-align:left; margin-bottom:1rem; }
+  table.list td { padding:.55rem .9rem; border-bottom:1px solid #eee; }
+  table.list td:first-child { font-weight:600; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -58,17 +64,40 @@ function shuffle(a) {
 
 function home() {
   app.innerHTML = `
-    <h1>Tarjetas de coreano</h1>
+    <h1>Vocabulario</h1>
     <p class="sub">${words.length} palabras cargadas. Elige una sesión:</p>
     <div class="modes">
       <button data-n="20">Sesión rápida <small>20 palabras</small></button>
       <button data-n="50">Sesión media <small>50 palabras</small></button>
       <button data-n="all">Sesión completa <small>${words.length} palabras</small></button>
+      <button class="secondary" id="list">Ver lista de palabras</button>
     </div>`;
   app.querySelectorAll('[data-n]').forEach(b => b.onclick = () => {
     const n = b.dataset.n === 'all' ? words.length : +b.dataset.n;
     start(shuffle(words).slice(0, n));
   });
+  document.getElementById('list').onclick = list;
+}
+
+function list() {
+  app.innerHTML = `
+    <h1>Lista de palabras</h1>
+    <p class="sub" id="count"></p>
+    <div class="searchbar">
+      <input class="search" id="q" placeholder="Buscar en coreano o español…">
+      <button class="secondary" id="menu">Volver al menú</button>
+    </div>
+    <table class="list"><tbody id="rows"></tbody></table>`;
+  const q = document.getElementById('q');
+  const render = () => {
+    const term = q.value.trim().toLowerCase();
+    const shown = words.filter(w => !term || w.ko.includes(term) || w.es.toLowerCase().includes(term));
+    document.getElementById('count').textContent = `${shown.length} de ${words.length} palabras`;
+    document.getElementById('rows').innerHTML = shown.map(w => `<tr><td>${w.ko}</td><td>${w.es}</td></tr>`).join('');
+  };
+  q.oninput = render;
+  render();
+  document.getElementById('menu').onclick = home;
 }
 
 function start(list) {
