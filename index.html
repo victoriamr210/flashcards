@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tarjetas de coreano</title>
+<style>
+  :root { --bg:#f6f4ef; --card:#fff; --ink:#222; --muted:#777; --accent:#2f5d8a; --ok:#2e7d4f; --bad:#b0413e; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:var(--bg); color:var(--ink); font-family:system-ui, -apple-system, sans-serif; padding:16px; }
+  main { width:100%; max-width:480px; text-align:center; }
+  h1 { font-size:1.6rem; margin:0 0 .3rem; }
+  p.sub { color:var(--muted); margin:0 0 1.5rem; }
+  button { font:inherit; border:0; border-radius:10px; padding:.85rem 1.2rem; cursor:pointer;
+           background:var(--accent); color:#fff; }
+  button.secondary { background:#e4e1da; color:var(--ink); }
+  button.ok { background:var(--ok); } button.bad { background:var(--bad); }
+  .modes { display:grid; gap:.75rem; }
+  .modes button { display:flex; justify-content:space-between; font-size:1.05rem; }
+  .modes small { opacity:.8; }
+  .progress { color:var(--muted); margin-bottom:.75rem; }
+  .card { background:var(--card); border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,.08);
+          min-height:240px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+          padding:2rem 1rem; margin-bottom:1rem; }
+  .ko { font-size:3rem; font-weight:600; }
+  .es { font-size:1.4rem; margin-top:1rem; color:var(--accent); }
+  .row { display:flex; gap:.75rem; } .row button { flex:1; }
+  .score { font-size:2.5rem; font-weight:700; margin:1rem 0; }
+  ul.missed { text-align:left; background:var(--card); border-radius:12px; padding:1rem 1rem 1rem 2rem; }
+  .error { color:var(--bad); }
+  .link { background:none; color:var(--muted); text-decoration:underline; margin-top:1rem; }
+</style>
+</head>
+<body>
+<main id="app"><p>Cargando vocabulario…</p></main>
+
+<script>
+const CSV_PATH = 'vocab/vocab.csv';
+const app = document.getElementById('app');
+let words = [], deck = [], i = 0, revealed = false, missed = [];
+
+function parse(text) {
+  return text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+    const cut = l.indexOf(',');
+    return { ko: l.slice(0, cut).trim(), es: l.slice(cut + 1).trim() };
+  });
+}
+
+function shuffle(a) {
+  a = a.slice();
+  for (let j = a.length - 1; j > 0; j--) {
+    const k = Math.floor(Math.random() * (j + 1));
+    [a[j], a[k]] = [a[k], a[j]];
+  }
+  return a;
+}
+
+function home() {
+  app.innerHTML = `
+    <h1>Tarjetas de coreano</h1>
+    <p class="sub">${words.length} palabras cargadas. Elige una sesión:</p>
+    <div class="modes">
+      <button data-n="20">Sesión rápida <small>20 palabras</small></button>
+      <button data-n="50">Sesión media <small>50 palabras</small></button>
+      <button data-n="all">Sesión completa <small>${words.length} palabras</small></button>
+    </div>`;
+  app.querySelectorAll('[data-n]').forEach(b => b.onclick = () => {
+    const n = b.dataset.n === 'all' ? words.length : +b.dataset.n;
+    start(shuffle(words).slice(0, n));
+  });
+}
+
+function start(list) {
+  deck = list; i = 0; missed = [];
+  show();
+}
+
+function show() {
+  revealed = false;
+  const w = deck[i];
+  app.innerHTML = `
+    <div class="progress">Tarjeta ${i + 1} de ${deck.length}</div>
+    <div class="card"><div class="ko">${w.ko}</div><div class="es" id="es" hidden>${w.es}</div></div>
+    <div class="row" id="actions"><button id="reveal">Mostrar traducción</button></div>
+    <button class="link" id="quit">Salir de la sesión</button>`;
+  document.getElementById('reveal').onclick = reveal;
+  document.getElementById('quit').onclick = home;
+}
+
+function reveal() {
+  revealed = true;
+  document.getElementById('es').hidden = false;
+  document.getElementById('actions').innerHTML = `
+    <button class="bad" id="no">No lo sabía</button>
+    <button class="ok" id="yes">Lo sabía</button>`;
+  document.getElementById('no').onclick = () => next(false);
+  document.getElementById('yes').onclick = () => next(true);
+}
+
+function next(knew) {
+  if (!knew) missed.push(deck[i]);
+  i++;
+  i < deck.length ? show() : finish();
+}
+
+function finish() {
+  const ok = deck.length - missed.length;
+  app.innerHTML = `
+    <h1>¡Sesión terminada!</h1>
+    <div class="score">${ok} / ${deck.length}</div>
+    ${missed.length ? `<p>Palabras para repasar:</p>
+      <ul class="missed">${missed.map(w => `<li><b>${w.ko}</b> — ${w.es}</li>`).join('')}</ul>` : '<p>¡Las sabías todas! 🎉</p>'}
+    <div class="row">
+      ${missed.length ? '<button id="retry">Repasar falladas</button>' : ''}
+      <button class="secondary" id="menu">Volver al menú</button>
+    </div>`;
+  if (missed.length) document.getElementById('retry').onclick = () => start(shuffle(missed));
+  document.getElementById('menu').onclick = home;
+}
+
+// Atajos: espacio/enter muestra; flechas ← (no lo sabía) y → (lo sabía)
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('actions')) return;
+  if (!revealed && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); reveal(); }
+  else if (revealed && e.key === 'ArrowLeft') next(false);
+  else if (revealed && e.key === 'ArrowRight') next(true);
+});
+
+fetch(CSV_PATH)
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+  .then(t => { words = parse(t); home(); })
+  .catch(() => {
+    app.innerHTML = `<p class="error">No se pudo cargar <code>${CSV_PATH}</code>.</p>
+      <p>Abre la app con un servidor local:<br><code>python3 -m http.server</code><br>y visita <code>http://localhost:8000</code></p>`;
+  });
+</script>
+</body>
+</html>
