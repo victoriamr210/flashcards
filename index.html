@@ -46,11 +46,18 @@ const CSV_PATH = 'vocab/vocab.csv';
 const app = document.getElementById('app');
 let words = [], deck = [], i = 0, revealed = false, missed = [];
 
+// Las líneas "# nombre" marcan el PDF del que vienen las palabras siguientes
 function parse(text) {
-  return text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+  let group = '';
+  return text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).flatMap(l => {
+    if (l.startsWith('#')) { group = l.slice(1).trim(); return []; }
     const cut = l.indexOf(',');
-    return { ko: l.slice(0, cut).trim(), es: l.slice(cut + 1).trim() };
+    return [{ ko: l.slice(0, cut).trim(), es: l.slice(cut + 1).trim(), group }];
   });
+}
+
+function groups() {
+  return [...new Set(words.map(w => w.group).filter(Boolean))];
 }
 
 function shuffle(a) {
@@ -70,13 +77,29 @@ function home() {
       <button data-n="20">Sesión rápida <small>20 palabras</small></button>
       <button data-n="50">Sesión media <small>50 palabras</small></button>
       <button data-n="all">Sesión completa <small>${words.length} palabras</small></button>
+      <button class="secondary" id="bypdf">Practicar por PDF</button>
       <button class="secondary" id="list">Ver lista de palabras</button>
     </div>`;
   app.querySelectorAll('[data-n]').forEach(b => b.onclick = () => {
     const n = b.dataset.n === 'all' ? words.length : +b.dataset.n;
     start(shuffle(words).slice(0, n));
   });
+  document.getElementById('bypdf').onclick = pdfMenu;
   document.getElementById('list').onclick = list;
+}
+
+function pdfMenu() {
+  const gs = groups();
+  app.innerHTML = `
+    <h1>Practicar por PDF</h1>
+    <p class="sub">Elige la lista de vocabulario:</p>
+    <div class="modes">
+      ${gs.map((g, n) => `<button data-g="${n}">${g} <small>${words.filter(w => w.group === g).length} palabras</small></button>`).join('')}
+      <button class="secondary" id="menu">Volver al menú</button>
+    </div>`;
+  app.querySelectorAll('[data-g]').forEach(b => b.onclick = () =>
+    start(shuffle(words.filter(w => w.group === gs[+b.dataset.g]))));
+  document.getElementById('menu').onclick = home;
 }
 
 function list() {
